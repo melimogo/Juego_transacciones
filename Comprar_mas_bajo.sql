@@ -11,7 +11,7 @@ create or replace PROCEDURE Precio_menor
           --cantida que voy a comprar simpre
           V_CANT SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.NMCANTIDAD%TYPE;
           --Mensaje de error
-          V_ERROR VARCHAR2(2);
+          V_ERROR VARCHAR2(200);
           --Variable para el precio
           V_PRECIO SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.PSVENTA%TYPE;
           --Variable para el codigo de mi empresa
