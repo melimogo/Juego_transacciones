@@ -8,6 +8,14 @@ create or replace PROCEDURE tiempo_final
 
           --coger los codigos de los productos
           V_COD_PROD SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.CDPRODUCTO%TYPE;
+          
+          --Mensaje de error
+          V_ERROR VARCHAR2(200);
+          -- Controlar errores:
+          err_num varchar(500);
+          err_msg varchar(500);
+
+          
 
 
           BEGIN
@@ -16,18 +24,24 @@ create or replace PROCEDURE tiempo_final
                 FETCH V_PRODUCTOS INTO V_COD_PROD;
                 EXIT WHEN V_PRODUCTOS%NOTFOUND;
                 SALVAREZ_PRUEBA.SP_CAMBIO_VALOR_PROD(V_COD_PROD,5,V_ERROR);
+                END LOOP;
+            CLOSE V_PRODUCTOS;
+            COMMIT;
 
          EXCEPTION
 
            WHEN NO_DATA_FOUND THEN
              dbms_output.put_line('El cursor no encuentra valores o el articulo ');
+             ROLLBACK;
 
            when TOO_MANY_ROWS THEN
              dbms_output.put_line('EL cursor devuelve muchas mas filas. Maloo');
+             ROLLBACK;
 
            WHEN OTHERS THEN
              err_num:= SQLCODE;
              err_msg:=SQLERRM;
              dbms_output.put_line('El error es el numero: ' || TO_CHAR(err_num) || ' El mensaje es: ' || err_msg);
+             ROLLBACK;
 
 end tiempo_final;
