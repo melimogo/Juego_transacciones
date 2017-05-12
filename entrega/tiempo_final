@@ -1,0 +1,34 @@
+create or replace PROCEDURE tiempo_final
+           IS
+           --cursor para recoger los codigos de los productos de mi empresa
+           CURSOR V_PRODUCTOS IS
+           SELECT CDPRODUCTO
+                 FROM salvarez_prueba.TSIM_PROD_X_EMPRESA
+                 WHERE CDEMPRESA = '00001';
+
+          --coger los codigos de los productos
+          V_COD_PROD SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.CDPRODUCTO%TYPE;
+
+
+          BEGIN
+          OPEN V_PRODUCTOS;
+              LOOP
+                FETCH V_PRODUCTOS INTO V_COD_PROD;
+                EXIT WHEN V_PRODUCTOS%NOTFOUND;
+                --todos mis productos mas baratos.
+                SALVAREZ_PRUEBA.SP_CAMBIO_VALOR_PROD(V_COD_PROD,5,V_ERROR);
+
+         EXCEPTION
+
+           WHEN NO_DATA_FOUND THEN
+             dbms_output.put_line('El cursor no encuentra valores o el articulo ');
+
+           when TOO_MANY_ROWS THEN
+             dbms_output.put_line('EL cursor devuelve muchas mas filas. Maloo');
+
+           WHEN OTHERS THEN
+             err_num:= SQLCODE;
+             err_msg:=SQLERRM;
+             dbms_output.put_line('El error es el numero: ' || TO_CHAR(err_num) || ' El mensaje es: ' || err_msg);
+
+end tiempo_final;

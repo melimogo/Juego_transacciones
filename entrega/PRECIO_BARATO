@@ -1,0 +1,91 @@
+
+create or replace PROCEDURE Precio_menor
+           IS
+           --cursor para recoger las cantidades, y los codigos de los productos de mi empresa
+           CURSOR V_NUM_PROD IS
+           SELECT CDPRODUCTO, NMCANTIDAD
+                 FROM salvarez_prueba.TSIM_PROD_X_EMPRESA
+                 WHERE CDEMPRESA = '21';
+
+          --Codigo de la empresa del profe
+          V_COD_EMPRESA SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.CDEMPRESA%TYPE;
+          --cantida que voy a comprar simpre
+          V_CANT SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.NMCANTIDAD%TYPE;
+          V_ERROR VARCHAR2(200);
+          --Variable para el precio
+          V_PRECIO SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.PSVENTA%TYPE;
+          --Variable para el codigo de mi empresa
+          V_COD_MY_EMP SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.CDEMPRESA%TYPE := '21';
+          -- codigo de los productos
+          V_COD_PROD SALVAREZ_PRUEBA.TSIM_PROD_X_EMPRESA.CDPRODUCTO%TYPE;
+          --SALDO DE MI empresa
+          V_SALDO SALVAREZ_PRUEBA.TSIM_EMPRESAS.PSBANCO%TYPE;
+
+          -- Controlar errores:
+          err_num varchar(500);
+          err_msg varchar(500);
+
+          --EXCEPTION declaradas
+          e_sin_saldo EXCEPTION;
+
+
+          BEGIN
+            OPEN V_NUM_PROD;
+                LOOP
+                  FETCH V_NUM_PROD INTO V_COD_PROD,V_CANT;
+                  EXIT WHEN V_NUM_PROD%NOTFOUND;
+                  --selecciona en el cursor, el precio de vena y el codigo de la empresa que tiene menor precio y la cantidad buena
+                 SELECT CDEMPRESA,PSVENTA INTO V_COD_EMPRESA,V_PRECIO
+                      FROM salvarez_prueba.TSIM_PROD_X_EMPRESA
+                      WHERE PSVENTA = (SELECT MIN(PSVENTA) FROM  salvarez_prueba.TSIM_PROD_X_EMPRESA WHERE CDPRODUCTO = V_COD_PROD AND CDEMPRESA <> '21'AND CDEMPRESA <> '00002' AND NMCANTIDAD >= 2)
+                      AND CDPRODUCTO = V_COD_PROD
+                      AND CDEMPRESA <> '21'
+                      AND CDEMPRESA <> '00002'
+                      AND NMCANTIDAD >= 2;
+
+                  -- Recopila el precio que tengo en el banco y mira si tengo la cantida suficiente de diniero para comprar
+                  -- tiene un limite de  100 en la cantida del banco, en caso contrario, se detiene el procedimiento.
+                  SELECT PSBANCO INTO V_SALDO FROM salvarez_prueba.TSIM_EMPRESAS WHERE CDEMPRESA = V_COD_MY_EMP ;
+
+                  IF(V_SALDO < 50 )THEN
+                      RAISE e_sin_saldo;
+                  ELSE
+                      -- finalmente compra 2 productos por cada transaccion.
+                      SALVAREZ_PRUEBA.SP_COMPRAR_PROD(V_COD_EMPRESA, V_COD_PROD,2,V_ERROR);
+                  END IF;
+
+
+                  -- Revisa el inventario y cambia los valores de venta, depende de q a quien le compren
+                  IF(V_CANT>=5) THEN
+                    V_PRECIO := V_PRECIO * 1.20;
+                  ELSE
+                    V_PRECIO := V_PRECIO * 1.50;
+                  END IF;
+                  -- cambia los valores de los productos, adicionandoles un 20 o 50 % al precio mas barato de la lista
+                  SALVAREZ_PRUEBA.SP_CAMBIO_VALOR_PROD(V_COD_PROD,V_PRECIO,V_ERROR);
+              END LOOP;
+            CLOSE V_NUM_PROD;
+            -- se ejecuta el commit si no hay exceptions
+            COMMIT;
+
+          EXCEPTION
+          -- para ver si no hay salgo
+            WHEN e_sin_saldo THEN
+              dbms_output.put_line('Error: No puedes comprar mas, NO TIENE PLATA');
+              ROLLBACK;
+          -- por si no encuentra datos
+            WHEN NO_DATA_FOUND THEN
+              dbms_output.put_line('El cursor no encuentra valores o el articulo ');
+                ROLLBACK;
+         -- por si la consulta trae mas de un registro
+            when TOO_MANY_ROWS THEN
+              dbms_output.put_line('EL cursor devuelve muchas mas filas. Maloo');
+                ROLLBACK;
+        -- reporta otra excepcion no capturada.
+            WHEN OTHERS THEN
+              err_num:= SQLCODE;
+              err_msg:=SQLERRM;
+              dbms_output.put_line('El error es el numero: ' || TO_CHAR(err_num) || ' El mensaje es: ' || err_msg);
+              ROLLBACK;
+          -- ROLLBACK para no guardar los cambios en la bd
+END Precio_menor;

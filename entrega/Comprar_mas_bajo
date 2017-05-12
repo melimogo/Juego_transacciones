@@ -1,0 +1,83 @@
+create or replace PROCEDURE COMPRAR_PRODUC(
+    nro_transacciones INT,
+    precio_max        INT)
+AS
+  v_total_trans      INT;
+  v_capital          INT;
+  v_nmcantidad       INT;
+  v_empresaid        VARCHAR2(10);
+  v_productoid       VARCHAR2(10);
+  v_nmcantcompr      INT;
+  v_compra           INT;
+  v_compra_realizada INT;
+  v_venta            INT;
+  v_capital_dispo    INT;
+ v_DSERROR           VARCHAR2(200);
+  v_invent           INT;
+  CURSOR cur1
+  IS
+    select cdempresa, cdproducto, nmcantidad, psventa
+      from salvarez_prueba.TSIM_PROD_X_EMPRESA
+      where nmcantidad <> 0 and cdempresa <> '21'
+      and psventa in(select Min(tpe.psventa)
+                    from salvarez_prueba.TSIM_PROD_X_EMPRESA tpe, salvarez_prueba.TSIM_EMPRESAS te
+                    where tpe.nmcantidad <> 0
+                    and tpe.cdempresa <> '21'
+                    and tpe.CDEMPRESA = te.CDEMPRESA
+                    and te.CDTIPO <> 'C'
+          having Min(tpe.psventa)<precio_max);
+
+
+BEGIN
+v_total_trans := 0;
+  WHILE v_total_trans < nro_transacciones
+  LOOP
+    SELECT psbanco
+    INTO v_capital
+    FROM salvarez_prueba.tsim_empresas
+    WHERE CDEMPRESA = '21';
+
+    SELECT COUNT(*)
+    INTO v_invent
+    FROM salvarez_prueba.tsim_prod_x_empresa
+    WHERE nmcantidad > 0
+    AND CDEMPRESA   <> '00002';
+
+    SELECT COUNT(*)
+    INTO v_capital_dispo
+    FROM salvarez_prueba.tsim_prod_x_empresa
+    WHERE nmcantidad    > 0
+    AND v_capital       > psventa;
+
+    IF (v_capital_dispo > 0) THEN
+      IF (v_invent > 0) THEN
+        OPEN cur1;
+        LOOP
+          FETCH cur1 INTO v_productoid, v_empresaid, v_nmcantidad, v_compra;
+          EXIT WHEN cur1%NOTFOUND;
+          v_nmcantcompr:= v_nmcantidad * 0.15;
+          v_compra_realizada := 0;
+          IF (v_nmcantidad == 0) THEN
+            v_nmcantidad := 1;
+          END IF;
+          IF v_capital >= (v_nmcantcompr * v_compra) THEN
+              salvarez_prueba.SP_COMPRAR_PROD(v_productoid, v_empresaid,v_nmcantcompr, v_DSERROR);
+                    v_compra_realizada := 1;
+                    v_total_trans      := v_total_trans + 1;
+                  ELSIF v_capital       > 0 THEN
+                    v_nmcantidad       := (v_capital/v_compra);
+                    salvarez_prueba.SP_COMPRAR_PROD(v_productoid, v_empresaid, v_nmcantcompr, v_DSERROR);
+                    v_compra_realizada := 1;
+                    v_total_trans      := v_total_trans + 1;
+          END IF;
+          IF (v_compra_realizada = 1) THEN
+            v_venta             := (v_compra*0.10) + v_compra;
+            salvarez_prueba.SP_CAMBIO_VALOR_PROD(v_productoid, v_venta, v_DSERROR);
+          END IF;
+        END LOOP;
+        CLOSE cur1;
+      END IF;
+    END IF;
+  END LOOP;
+  COMMIT;
+END COMPRAR_PRODUC;
